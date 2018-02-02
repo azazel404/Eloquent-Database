@@ -5,14 +5,14 @@ class database{
   /*property untuk untuk function singletorn
     conn untuk koneksi , table untuk manggil nama table , kolom untuk nama kolom ,
     stmt = statement buat prepared , attr adalah attribute buat prepared , param untuk
-    bind param , prevdata , untuk attribute , pemanggilan array attribute
+    bind param , attr_data , untuk attribute , pemanggilan array attribute
   */
   private static $instance;
-  private $conn , $table , $column = "*" , $query , $stmt ,$attr , $param = [] , $prevdata = [];
+  private $conn , $table , $column = "*" , $query , $stmt ,$attr , $param = [] , $attr_data = [];
   private $server = "localhost",
-          $user   = "",
-          $pass   = "",
-          $dbname = "";
+          $user   = "root",
+          $pass   = "gunawan02",
+          $dbname = "loginOOP";
 
   public function __construct(){
     try {
@@ -62,11 +62,11 @@ class database{
   //fungsi untuk penyambung query dengan AND
   public function where($cols , $sign , $data , $bridge = ' AND '){
 
-    if (count($this->prevdata) == 0) {
+    if (count($this->attr_data) == 0) {
       $bridge = "";
     }
     $this->query = "SELECT $this->column FROM $this->table WHERE";
-    $this->prevdata[] = array(
+    $this->attr_data[] = array(
         "cols" => $cols,
         "sign" => $sign,
         "data" => $data,
@@ -84,14 +84,14 @@ class database{
   //fungsi untuk eksekusi where AND dan WHERE OR
   //fungsi untuk eksekusi where AND dan WHERE OR
   public function getWhere($bridge){
-    if (count($this->prevdata) > 1) {
+    if (count($this->attr_data) > 1) {
       $this->attr = '';
       $this->param = [];
     }
     $x = 1;
-    foreach ($this->prevdata as $value) {
+    foreach ($this->attr_data as $value) {
 
-      if ($x <= count($this->prevdata)) {
+      if ($x <= count($this->attr_data)) {
       $this->attr .= $value['bridge'];
         }
 
@@ -162,7 +162,7 @@ class database{
   }
 
   public function flush(){
-    $this->prevdata = "";
+    $this->attr_data = "";
     $this->param = [];
     $this->query = "";
     $this->attr = "";
