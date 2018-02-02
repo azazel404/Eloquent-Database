@@ -10,9 +10,9 @@ class database{
   private static $instance;
   private $conn , $table , $column = "*" , $query , $stmt ,$attr , $param = [] , $attr_data = [];
   private $server = "localhost",
-          $user   = "root",
-          $pass   = "gunawan02",
-          $dbname = "loginOOP";
+          $user   = "",
+          $pass   = "",
+          $dbname = "";
 
   public function __construct(){
     try {
