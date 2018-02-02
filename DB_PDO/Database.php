@@ -1,213 +1,191 @@
 <?php
 
-class Database
-{
-    /*
-    * add database credentials
-    */
-    private $server = 'localhost',
-            $user   = 'root',
-            $pass   = 'root',
-            $dbName = 'pdo_tuts';
+class database{
 
-    private static $_instance = null;
+  /*property untuk untuk function singletorn
+    conn untuk koneksi , table untuk manggil nama table , kolom untuk nama kolom ,
+    stmt = statement buat prepared , attr adalah attribute buat prepared , param untuk
+    bind param , prevdata , untuk attribute , pemanggilan array attribute
+  */
+  private static $instance;
+  private $conn , $table , $column = "*" , $query , $stmt ,$attr , $param = [] , $prevdata = [];
+  private $server = "localhost",
+          $user   = "",
+          $pass   = "",
+          $dbname = "";
 
-    private $_conn, $_table, $_columns = '*', $_query, $_statement, $_attr,
-            $_params = [], $_prevData = [];
+  public function __construct(){
+    try {
+      $this->conn = new PDO("mysql:host=$this->server;dbname=$this->dbname", $this->user , $this->pass);
+      $this->conn->setAttribute(PDO::ATTR_ERRMODE , PDO::ERRMODE_EXCEPTION);
+    } catch (PDOexception $e) {
+      die($e->getMessage);
+    }
+  }
 
-    //---- construct
-    public function __construct()
-    {
-      try {
-        $this->_conn = new PDO("mysql:host=$this->server;dbname=$this->dbName", $this->user, $this->pass);
-        $this->_conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-      }catch (PDOException $e){
-        die($e->getMessage());
+  public static function getInstance(){
+      if (!isset (self::$instance)) {
+        self::$instance = new database();
       }
+      return self::$instance;
     }
 
-    //get database, singleton pattern
-    public static function getInstance()
-    {
-      if (!isset(self::$_instance)) {
-        self::$_instance = new Database();
-      }
+  public function __clone(){
+    return false;
+  }
 
-      return self::$_instance;
+  //untuk mengeset table yang ingin dipilih
+  public function setTable($table){
+    $this->table = $table;
+    return $this;
+  }
+
+  //untuk memilih data
+  public function selectData($column = "*"){
+    $this->query = "SELECT $column FROM $this->table";
+    $this->column = $column;
+    return $this;
+  }
+
+    //untuk menampilkan semua data
+  public function all(){
+    $this->run();
+    return $this->stmt->fetchall(PDO::FETCH_OBJ);
+  }
+  //untuk menampilkan 1 data
+
+  public function first(){
+    $this->run();
+    return $this->stmt->fetch(PDO::FETCH_OBJ);
+  }
+
+  //fungsi untuk penyambung query dengan AND
+  public function where($cols , $sign , $data , $bridge = ' AND '){
+
+    if (count($this->prevdata) == 0) {
+      $bridge = "";
     }
+    $this->query = "SELECT $this->column FROM $this->table WHERE";
+    $this->prevdata[] = array(
+        "cols" => $cols,
+        "sign" => $sign,
+        "data" => $data,
+        "bridge" => $bridge
+    );
+    $this->getWhere($bridge);
+    return $this;
+  }
 
-    //prevent from clone
-    public function __clone()
-    {
-      return false;
+//fungsi untuk penyambung query dengan OR
+  public function orWhere($cols ,$sign ,$data){
+    $this->where($cols , $sign , $data ,$bridge = " OR ");
+    return $this;
+  }
+  //fungsi untuk eksekusi where AND dan WHERE OR
+  //fungsi untuk eksekusi where AND dan WHERE OR
+  public function getWhere($bridge){
+    if (count($this->prevdata) > 1) {
+      $this->attr = '';
+      $this->param = [];
     }
+    $x = 1;
+    foreach ($this->prevdata as $value) {
 
-    //set table to used
-    public function setTable($table)
-    {
-      $this->_table = $table;
-      return $this;
-    }
-
-    //set which columns
-    public function select($columns = '*')
-    {
-      $this->_query   = "SELECT $columns FROM $this->_table";
-      $this->_columns = $columns;
-      return $this;
-    }
-
-    public function all()
-    {
-      $this->run();
-      return $this->_statement->fetchAll(PDO::FETCH_OBJ);
-    }
-
-    public function first()
-    {
-      $this->run();
-      return $this->_statement->fetch(PDO::FETCH_OBJ);
-    }
-
-    public function run()
-    {
-      var_dump($this->_params);
-      die($this->_query . ' '. $this->_attr);
-
-      try {
-        $this->_statement = $this->_conn->prepare($this->_query . ' '. $this->_attr);
-        $this->_statement->execute($this->_params);
-        $this->flush();
-      } catch (Exception $e) {
-        die($e->getMessage());
-      }
-    }
-
-    public function where($col, $sign, $value, $bridge = ' AND ')
-    {
-      $this->_query       = "SELECT $this->_columns FROM $this->_table WHERE";
-
-      //first where method
-      if (count($this->_prevData) == 0) {
-        $bridge = '';
-      }
-
-      $this->_prevData[]  = array(
-                              'col'    => $col,
-                              'sign'   => $sign,
-                              'value'  => $value,
-                              'bridge' => $bridge,
-                            );
-
-      $this->getWhere($bridge);
-      return $this;
-    }
-
-    public function orWhere($col, $sign, $value)
-    {
-      $this->where($col, $sign, $value, $bridge = ' OR ');
-      return $this;
-    }
-
-    public function getWhere($bridge)
-    {
-      //clear multiple where
-      if (count($this->_prevData) > 1) {
-          $this->_attr   = '';
-          $this->_params = [];
-      }
-
-      $x = 1;
-      foreach ($this->_prevData as $prev) {
-
-        if ($x <= count($this->_prevData)) {
-          $this->_attr .= $prev['bridge'];
+      if ($x <= count($this->prevdata)) {
+      $this->attr .= $value['bridge'];
         }
 
-        $this->_attr    .=  $prev['col'] . ' ' .$prev['sign'] . ' ?';
-        $this->_params[] = $prev['value'];
+      $this->attr .= $value['cols'] . " ".$value['sign'] . ' ?';
+      $this->param[] = $value['data'];
 
-        $x++;
-      }
-
-      return $this;
+    $x++;
     }
+    return $this;
+  }
 
-    //insert data
-    public function create($fields = array())
-    {
-      $cols   = implode(", ", array_keys($fields));
-      $values = '';
-      $x      = 1;
+//fungsi untuk membuat data
+  public function createData($fields = array()){
+    $columns = implode(" ,",array_keys($fields));
+    $value = "";
+    $x = 1;
+    foreach ($fields as $field) {
+      $this->param[] = $field;
+      $value .= '?';
+            if ($x < count($fields)) {
+              $value .= ', ';
+            }
+      $x++;
+    }
+    $this->query = "INSERT INTO $this->table($columns) VALUES ($value)";
+    $this->run();
+  }
 
-      foreach ($fields as $field) {
-        $this->_params[] = $field;
-        $values .= '?';
+  //fungsi untuk update
+  public function update($fields = array()){
+    $col = '';
+    $x = 1;
+    $count = count($this->param);
+    foreach ($fields as $key => $value) {
+      $this->param[] = $value;
+      $col .= $key .'=?';
 
         if ($x < count($fields)) {
-          $values .= ', ';
+          $col .= ', ';
         }
         $x++;
-      }
-
-      $this->_query = "INSERT INTO $this->_table($cols) VALUES ($values)";
-      $this->run();
+    }
+    //memindahkan array yang dipertama menjadi diakhir
+    for ($i=0; $i < count($count) ; $i++) {
+      $this->param[] = array_shift($this->param);
     }
 
-    //update data
-    public function update($fields = array())
-    {
-      $cols = '';
-      $x    = 1;
+    $this->query = "UPDATE $this->table SET $col WHERE";
+    $this->run();
+  }
 
-      $total_prev = count($this->_params);
+  //fungsi untuk menghapus database
+  public function delete(){
+    $this->query = "DELETE FROM $this->table WHERE";
+    $this->run();
+  }
 
-      foreach ($fields as $key => $value) {
-        $this->_params[] = $value;
-        $cols .= $key .'=?';
+  //fungsi untuk menyusun hasil dari yang kita tampilkan berdasarkan tampilan tanya
+  public function OrderBy($col = "id" ,$type){
+    $this->attr .= " ORDER BY $col $type";
+    return $this;
+  }
 
-        if ($x < count($fields)) {
-          $cols .= ', ';
-        }
-        $x++;
-      }
+  //fungsi untuk melimit data yang ditampilkan
+  public function LimitID($number){
+    $this->attr .= "LIMIT $number";
+    return $this;
+  }
 
-      for ($i=0; $i<$total_prev; $i++) {
-        $this->_params[] = array_shift($this->_params);
-      }
+  public function flush(){
+    $this->prevdata = "";
+    $this->param = [];
+    $this->query = "";
+    $this->attr = "";
+  }
 
-      $this->_query = "UPDATE $this->_table SET $cols WHERE";
-      $this->run();
+
+
+  //function untuk menjalankan perintah query
+  public function run(){
+    try {
+      // var_dump($this->param);
+      die($this->query ." ". $this->attr);
+      $this->stmt = $this->conn->prepare($this->query ." ". $this->attr);
+      $this->stmt->execute($this->param);
+      $this->flush();
+    } catch (PDOexception $e) {
+      die($e->getMessage());
     }
+  }
 
-    //menghapus data
-    public function delete()
-    {
-      $this->_query = "DELETE FROM $this->_table WHERE";
-      $this->run();
-    }
-
-    public function orderBy($col = 'id', $type)
-    {
-      $this->_attr .= " ORDER BY $col $type";
-      return $this;
-    }
-
-    //limit query
-    public function take($num)
-    {
-      $this->_attr .= " LIMIT $num";
-      return $this;
-    }
-
-    public function flush()
-    {
-      $this->_attr   = '';
-      $this->_query  = '';
-      $this->_params = [];
-      $this->_prevData = [];
-    }
 
 
 
 }
+
+ ?>
